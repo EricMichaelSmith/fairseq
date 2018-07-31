@@ -256,7 +256,7 @@ class TransformerClassifier(BaseFairseqModel):
                     transposed.size(2),
                 ],
                 dtype=transposed.dtype,
-            )
+            ).cuda()
             transposed = torch.cat([transposed, pad_tensor], dim=1)
 
         # Flatten the last two dimensions so that the linear layer can connect
