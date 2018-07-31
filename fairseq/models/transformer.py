@@ -19,6 +19,7 @@ from fairseq.modules import (
 )
 
 from . import (
+    BaseFairseqModel,
     FairseqIncrementalDecoder, FairseqEncoder, FairseqLanguageModel, FairseqModel, register_model,
     register_model_architecture,
 )
@@ -88,16 +89,6 @@ class TransformerModel(FairseqModel):
             args.max_target_positions = 1024
 
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
-
-        def build_embedding(dictionary, embed_dim, path=None):
-            num_embeddings = len(dictionary)
-            padding_idx = dictionary.pad()
-            emb = Embedding(num_embeddings, embed_dim, padding_idx)
-            # if provided, load from preloaded dictionaries
-            if path:
-                embed_dict = utils.parse_embedding(path)
-                utils.load_embedding(embed_dict, dictionary, emb)
-            return emb
 
         if args.share_all_embeddings:
             if src_dict != tgt_dict:
@@ -174,6 +165,84 @@ class TransformerLanguageModel(FairseqLanguageModel):
 
         decoder = TransformerDecoder(args, task.dictionary, embed_tokens, no_encoder_attn=True)
         return TransformerLanguageModel(decoder)
+
+
+@register_model('transformer_classifier')
+class TransformerClassifier(BaseFairseqModel):
+    """
+    Transformer encoder with a linear layer and softmax appended.
+    """
+
+    def __init__(self, encoder, tgt_dict, embed_dim: int, num_classes: int):
+        super().__init__()
+
+        self.encoder = encoder
+        assert isinstance(self.encoder, FairseqEncoder)
+
+        self.tgt_dict = tgt_dict
+        self.supervised_layer = nn.ModuleList([
+            nn.Linear(embed_dim, num_classes),
+            nn.LogSoftmax(num_classes),
+        ])
+
+    @staticmethod
+    def add_args(parser):
+        """Add model-specific arguments to the parser."""
+        parser.add_argument('--dropout', type=float, metavar='D',
+                            help='dropout probability')
+        parser.add_argument('--attention-dropout', type=float, metavar='D',
+                            help='dropout probability for attention weights')
+        parser.add_argument('--relu-dropout', type=float, metavar='D',
+                            help='dropout probability after ReLU in FFN')
+        parser.add_argument('--encoder-embed-path', type=str, metavar='STR',
+                            help='path to pre-trained encoder embedding')
+        parser.add_argument('--encoder-embed-dim', type=int, metavar='N',
+                            help='encoder embedding dimension')
+        parser.add_argument('--encoder-ffn-embed-dim', type=int, metavar='N',
+                            help='encoder embedding dimension for FFN')
+        parser.add_argument('--encoder-layers', type=int, metavar='N',
+                            help='num encoder layers')
+        parser.add_argument('--encoder-attention-heads', type=int, metavar='N',
+                            help='num encoder attention heads')
+        parser.add_argument('--encoder-normalize-before', action='store_true',
+                            help='apply layernorm before each encoder block')
+        parser.add_argument('--encoder-learned-pos', action='store_true',
+                            help=(
+                                'use learned positional embeddings in the '
+                                'encoder'
+                            ))
+
+    @classmethod
+    def build_model(cls, args, task):
+        """Build a new model instance."""
+
+        if not hasattr(args, 'max_source_positions'):
+            args.max_source_positions = 1024
+
+        src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
+
+        encoder_embed_tokens = build_embedding(
+            src_dict, args.encoder_embed_dim, args.encoder_embed_path,
+        )
+
+        encoder = TransformerEncoder(args, src_dict, encoder_embed_tokens)
+
+        return TransformerClassifier(
+            encoder, tgt_dict, args.encoder_embed_dim, len(tgt_dict),
+        )
+
+    def forward(self, src_tokens, *_):
+
+        encoder_out = self.encoder(src_tokens, src_lengths=None)
+
+        # Supervised layer
+        log_probabilities = self.supervised_layer(encoder_out)
+
+        return log_probabilities
+
+    def max_positions(self):
+        """Maximum input length supported by the encoder."""
+        return self.encoder.max_positions()
 
 
 class TransformerEncoder(FairseqEncoder):
@@ -502,6 +571,17 @@ def Embedding(num_embeddings, embedding_dim, padding_idx):
     return m
 
 
+def build_embedding(dictionary, embed_dim, path=None):
+    num_embeddings = len(dictionary)
+    padding_idx = dictionary.pad()
+    emb = Embedding(num_embeddings, embed_dim, padding_idx)
+    # if provided, load from preloaded dictionaries
+    if path:
+        embed_dict = utils.parse_embedding(path)
+        utils.load_embedding(embed_dict, dictionary, emb)
+    return emb
+
+
 def LayerNorm(embedding_dim):
     m = nn.LayerNorm(embedding_dim)
     return m
@@ -636,3 +716,18 @@ def transformer_wmt_en_de_big_t2t(args):
     args.attention_dropout = getattr(args, 'attention_dropout', 0.1)
     args.relu_dropout = getattr(args, 'relu_dropout', 0.1)
     transformer_vaswani_wmt_en_de_big(args)
+
+
+@register_model_architecture('transformer_classifier', 'transformer_classifier')
+def transformer_architecture(args):
+    args.encoder_embed_path = getattr(args, 'encoder_embed_path', None)
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
+    args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 2048)
+    args.encoder_layers = getattr(args, 'encoder_layers', 6)
+    args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 8)
+    args.encoder_normalize_before = getattr(args, 'encoder_normalize_before', False)
+    args.encoder_learned_pos = getattr(args, 'encoder_learned_pos', False)
+    args.attention_dropout = getattr(args, 'attention_dropout', 0.)
+    args.relu_dropout = getattr(args, 'relu_dropout', 0.)
+    args.dropout = getattr(args, 'dropout', 0.1)
+    args.no_token_positional_embeddings = getattr(args, 'no_token_positional_embeddings', False)
