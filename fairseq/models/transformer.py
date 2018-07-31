@@ -233,7 +233,7 @@ class TransformerClassifier(BaseFairseqModel):
 
         encoder_out = self.encoder(src_tokens, src_lengths)
 
-        logits = F.linear(encoder_out, self.embed_out)
+        logits = F.linear(encoder_out['encoder_out'], self.embed_out)
         attn = None
 
         return logits, attn
