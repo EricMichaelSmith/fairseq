@@ -243,31 +243,18 @@ class TransformerClassifier(BaseFairseqModel):
         # T x B x C -> B x T x C
         transposed = encoder_out.transpose(0, 1)
 
-        # If the number of tokens is less than the maximum number of source
-        # positions (for instance, when training on a dummy batch), pad the
-        # tensor with zeros.
-        if transposed.size(1) < self.encoder.max_positions():
-            pad_tensor = torch.zeros(
-                size=[
-                    transposed.size(0),
-                    self.encoder.max_positions() - transposed.size(1),
-                    transposed.size(2),
-                ],
-                dtype=transposed.dtype,
-            ).cuda()
-            transposed = torch.cat([transposed, pad_tensor], dim=1)
-
-        # Flatten the last two dimensions so that the linear layer can connect
-        # the embeddings for all input tokens to the same output token (namely,
-        # the class label)
-        flattened = transposed.view(transposed.size(0), 1, -1)
+        # Average over the token embeddings, which of course removes token
+        # position information. (Before, I instead tried flattening the token
+        # and embedding dimensions to preserve positional information, but this
+        # led to out-of-memory errors.)
+        averaged = torch.mean(transposed, dim=1, keepdim=True)
 
         # Duplicate the elements of the tensor over the token dimension so that
         # the size of the token dimension will equal 2, same as the number of
         # target positions. Since the second target token is always EOS, this
         # means that half of the connections of the linear layer will map to
         # logit nodes for a dummy position.
-        repeated = flattened.repeat(1, 2, 1)
+        repeated = averaged.repeat(1, 2, 1)
 
         logits = F.linear(repeated, self.embed_out)
         attn = None
