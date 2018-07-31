@@ -251,9 +251,10 @@ class TransformerClassifier(BaseFairseqModel):
         """
         Tuple of length 2:
         0. Maximum input length supported by the encoder
-        1. 1 because the target sequence is a classification label
+        1. 2 because the target sequence is a classification label (+ a stop
+            token)
         """
-        return self.encoder.max_positions(), 1
+        return self.encoder.max_positions(), 2
 
 
 class TransformerEncoder(FairseqEncoder):
