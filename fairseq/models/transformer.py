@@ -173,13 +173,11 @@ class TransformerClassifier(BaseFairseqModel):
     Transformer encoder with a linear layer and softmax appended.
     """
 
-    def __init__(self, encoder, tgt_dict):
+    def __init__(self, encoder, tgt_dict, embed_dim: int):
         super().__init__()
 
         self.encoder = encoder
         assert isinstance(self.encoder, FairseqEncoder)
-
-        embed_dim = self.encoder.max_positions()
 
         self.tgt_dict = tgt_dict
         self.embed_out = nn.Parameter(
@@ -236,7 +234,7 @@ class TransformerClassifier(BaseFairseqModel):
 
         encoder = TransformerEncoder(args, src_dict, encoder_embed_tokens)
 
-        return TransformerClassifier(encoder, tgt_dict)
+        return TransformerClassifier(encoder, tgt_dict, args.encoder_embed_dim)
 
     def forward(self, src_tokens, src_lengths, **_):
 
