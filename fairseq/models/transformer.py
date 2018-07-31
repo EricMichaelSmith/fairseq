@@ -173,15 +173,19 @@ class TransformerClassifier(BaseFairseqModel):
     Transformer encoder with a linear layer and softmax appended.
     """
 
-    def __init__(self, encoder, tgt_dict, embed_dim: int):
+    def __init__(self, encoder, tgt_dict):
         super().__init__()
 
         self.encoder = encoder
         assert isinstance(self.encoder, FairseqEncoder)
 
+        embed_dim = self.encoder.max_positions()
+
         self.tgt_dict = tgt_dict
         self.embed_out = nn.Parameter(
-            torch.Tensor(len(self.tgt_dict), embed_dim),
+            torch.Tensor(
+                len(self.tgt_dict), embed_dim * self.encoder.max_positions(),
+            ),
         )
         nn.init.normal_(self.embed_out, mean=0, std=embed_dim ** -0.5)
 
@@ -219,6 +223,11 @@ class TransformerClassifier(BaseFairseqModel):
         if not hasattr(args, 'max_source_positions'):
             args.max_source_positions = 1024
 
+        assert args.max_target_positions == 2, (
+            '--max-target-positions must be 2 so that samples of the target '
+            'language can be interpreted as a (class_label, EOS) token pair!'
+        )
+
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
 
         encoder_embed_tokens = build_embedding(
@@ -227,13 +236,42 @@ class TransformerClassifier(BaseFairseqModel):
 
         encoder = TransformerEncoder(args, src_dict, encoder_embed_tokens)
 
-        return TransformerClassifier(encoder, tgt_dict, args.encoder_embed_dim)
+        return TransformerClassifier(encoder, tgt_dict)
 
     def forward(self, src_tokens, src_lengths, **_):
 
-        encoder_out = self.encoder(src_tokens, src_lengths)
+        encoder_out = self.encoder(src_tokens, src_lengths)['encoder_out']
 
-        logits = F.linear(encoder_out['encoder_out'], self.embed_out)
+        # T x B x C -> B x T x C
+        transposed = encoder_out.transpose(0, 1)
+
+        # If the number of tokens is less than the maximum number of source
+        # positions (for instance, when training on a dummy batch), pad the
+        # tensor with zeros.
+        if transposed.size(1) < self.encoder.max_positions():
+            pad_tensor = torch.zeros(
+                size=[
+                    transposed.size(0),
+                    self.encoder.max_positions() - transposed.size(1),
+                    transposed.size(2),
+                ],
+                dtype=transposed.dtype,
+            )
+            transposed = torch.cat([transposed, pad_tensor], dim=1)
+
+        # Flatten the last two dimensions so that the linear layer can connect
+        # the embeddings for all input tokens to the same output token (namely,
+        # the class label)
+        flattened = transposed.view(transposed.size(0), 1, -1)
+
+        # Duplicate the elements of the tensor over the token dimension so that
+        # the size of the token dimension will equal 2, same as the number of
+        # target positions. Since the second target token is always EOS, this
+        # means that half of the connections of the linear layer will map to
+        # logit nodes for a dummy position.
+        repeated = flattened.repeat(1, 2, 1)
+
+        logits = F.linear(repeated, self.embed_out)
         attn = None
 
         return logits, attn
