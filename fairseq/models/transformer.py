@@ -248,8 +248,12 @@ class TransformerClassifier(BaseFairseqModel):
             return F.softmax(logits, dim=-1)
 
     def max_positions(self):
-        """Maximum input length supported by the encoder."""
-        return self.encoder.max_positions()
+        """
+        Tuple of length 2:
+        0. Maximum input length supported by the encoder
+        1. 1 because the target sequence is a classification label
+        """
+        return self.encoder.max_positions(), 1
 
 
 class TransformerEncoder(FairseqEncoder):
