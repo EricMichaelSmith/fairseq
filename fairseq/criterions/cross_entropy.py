@@ -54,38 +54,3 @@ class CrossEntropyCriterion(FairseqCriterion):
         if sample_size != ntokens:
             agg_output['nll_loss'] = loss_sum / ntokens / math.log(2)
         return agg_output
-
-
-@register_criterion('classifier_cross_entropy')
-class ClassifierCrossEntropyCriterion(CrossEntropyCriterion):
-
-    def __init__(self, args, task):
-        super().__init__(args, task)
-
-    def forward(self, model, sample, reduce=True):
-        """Compute the loss for the given sample.
-
-        Returns a tuple with three elements:
-        1) the loss
-        2) the sample size, which is used as the denominator for the gradient
-        3) logging outputs to display while training
-        """
-        lprobs = model.forward(sample['src_tokens'])
-        lprobs = lprobs.view(-1, lprobs.size(-1))
-        target = sample['target'].view(-1)
-        loss = F.nll_loss(
-            input=lprobs,
-            target=target,
-            size_average=False,
-            reduce=reduce,
-        )
-        sample_size = (
-            sample['target'].size(0)
-            if self.args.sentence_avg else sample['ntokens']
-        )
-        logging_output = {
-            'loss': utils.item(loss.data) if reduce else loss.data,
-            'ntokens': sample['ntokens'],
-            'sample_size': sample_size,
-        }
-        return loss, sample_size, logging_output

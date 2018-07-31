@@ -173,17 +173,17 @@ class TransformerClassifier(BaseFairseqModel):
     Transformer encoder with a linear layer and softmax appended.
     """
 
-    def __init__(self, encoder, tgt_dict, embed_dim: int, num_classes: int):
+    def __init__(self, encoder, tgt_dict, embed_dim: int):
         super().__init__()
 
         self.encoder = encoder
         assert isinstance(self.encoder, FairseqEncoder)
 
         self.tgt_dict = tgt_dict
-        self.supervised_layer = nn.ModuleList([
-            nn.Linear(embed_dim, num_classes),
-            nn.LogSoftmax(num_classes),
-        ])
+        self.embed_out = nn.Parameter(
+            torch.Tensor(len(self.tgt_dict), embed_dim),
+        )
+        nn.init.normal_(self.embed_out, mean=0, std=embed_dim ** -0.5)
 
     @staticmethod
     def add_args(parser):
@@ -227,18 +227,25 @@ class TransformerClassifier(BaseFairseqModel):
 
         encoder = TransformerEncoder(args, src_dict, encoder_embed_tokens)
 
-        return TransformerClassifier(
-            encoder, tgt_dict, args.encoder_embed_dim, len(tgt_dict),
-        )
+        return TransformerClassifier(encoder, tgt_dict, args.encoder_embed_dim)
 
     def forward(self, src_tokens, *_):
 
         encoder_out = self.encoder(src_tokens, src_lengths=None)
 
-        # Supervised layer
-        log_probabilities = self.supervised_layer(encoder_out)
+        logits = F.linear(encoder_out, self.embed_out)
+        attn = None
 
-        return log_probabilities
+        return logits, attn
+
+    def get_normalized_probs(self, net_output, log_probs, sample=None):
+        """Get normalized probabilities (or log probs) from a net's output."""
+
+        logits = net_output[0].float()
+        if log_probs:
+            return F.log_softmax(logits, dim=-1)
+        else:
+            return F.softmax(logits, dim=-1)
 
     def max_positions(self):
         """Maximum input length supported by the encoder."""
