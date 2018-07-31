@@ -181,9 +181,7 @@ class TransformerClassifier(BaseFairseqModel):
 
         self.tgt_dict = tgt_dict
         self.embed_out = nn.Parameter(
-            torch.Tensor(
-                len(self.tgt_dict), embed_dim * self.encoder.max_positions(),
-            ),
+            torch.Tensor(len(self.tgt_dict), embed_dim),
         )
         nn.init.normal_(self.embed_out, mean=0, std=embed_dim ** -0.5)
 
