@@ -229,9 +229,9 @@ class TransformerClassifier(BaseFairseqModel):
 
         return TransformerClassifier(encoder, tgt_dict, args.encoder_embed_dim)
 
-    def forward(self, src_tokens, **_):
+    def forward(self, src_tokens, src_lengths, **_):
 
-        encoder_out = self.encoder(src_tokens)
+        encoder_out = self.encoder(src_tokens, src_lengths)
 
         logits = F.linear(encoder_out, self.embed_out)
         attn = None
