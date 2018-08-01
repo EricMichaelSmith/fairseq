@@ -418,7 +418,7 @@ class TransformerClassifierDecoder(FairseqDecoder):
         super().__init__(dictionary)
 
         self.embed_out = nn.Parameter(
-            torch.Tensor(len(self.tgt_dict), embed_dim),
+            torch.Tensor(len(self.dictionary), embed_dim),
         )
         nn.init.normal_(self.embed_out, mean=0, std=embed_dim ** -0.5)
 
