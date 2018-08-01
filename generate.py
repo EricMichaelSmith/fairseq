@@ -93,6 +93,22 @@ def main(args):
                 cuda=use_cuda, timer=gen_timer, prefix_size=args.prefix_size,
             )
 
+        # Create a file object to write outputs to
+        if args.output_file is not None:
+
+            f_write = open(args.output_file, 'w')
+
+        else:
+
+            class DummyFileObj:
+                def write(self, str_):
+                    pass
+
+                def close(self):
+                    pass
+
+            f_write = DummyFileObj()
+
         wps_meter = TimeMeter()
         for sample_id, src_tokens, target_tokens, hypos in translations:
             # Process input and ground truth
@@ -148,9 +164,17 @@ def main(args):
                             target_str, tgt_dict, add_if_not_exist=True)
                     scorer.add(target_tokens, hypo_tokens)
 
+                    output_string = ','.join([
+                        sample_id, f'"{src_str}"', f'"{target_str}"',
+                        hypo['score'], hypo_str,
+                    ])
+                    f_write.write(f'{output_string}\n')
+
             wps_meter.update(src_tokens.size(0))
             t.log({'wps': round(wps_meter.avg)})
             num_sentences += 1
+
+        f_write.close()
 
     print('| Translated {} sentences ({} tokens) in {:.1f}s ({:.2f} sentences/s, {:.2f} tokens/s)'.format(
         num_sentences, gen_timer.n, gen_timer.sum, num_sentences / gen_timer.sum, 1. / gen_timer.avg))

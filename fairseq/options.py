@@ -303,6 +303,8 @@ def add_generation_args(parser):
                        help='if set, uses attention feedback to compute and print alignment to source tokens')
     group.add_argument('--model-overrides', default="{}", type=str, metavar='DICT',
                        help='a dictionary used to override model args at generation that were used during model training')
+    group.add_argument('--output-file', default=None, type=str, metavar='FILE',
+                       help='the path to a CSV file to store output information for each generated translation')
     return group
 
 
