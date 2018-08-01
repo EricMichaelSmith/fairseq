@@ -19,7 +19,7 @@ from fairseq.modules import (
 )
 
 from . import (
-    BaseFairseqModel,
+    FairseqDecoder,
     FairseqIncrementalDecoder, FairseqEncoder, FairseqLanguageModel, FairseqModel, register_model,
     register_model_architecture,
 )
@@ -168,22 +168,13 @@ class TransformerLanguageModel(FairseqLanguageModel):
 
 
 @register_model('transformer_classifier')
-class TransformerClassifier(BaseFairseqModel):
+class TransformerClassifier(FairseqModel):
     """
     Transformer encoder with a linear layer and softmax appended.
     """
 
-    def __init__(self, encoder, tgt_dict, embed_dim: int):
-        super().__init__()
-
-        self.encoder = encoder
-        assert isinstance(self.encoder, FairseqEncoder)
-
-        self.tgt_dict = tgt_dict
-        self.embed_out = nn.Parameter(
-            torch.Tensor(len(self.tgt_dict), embed_dim),
-        )
-        nn.init.normal_(self.embed_out, mean=0, std=embed_dim ** -0.5)
+    def __init__(self, encoder, decoder):
+        super().__init__(encoder, decoder)
 
     @staticmethod
     def add_args(parser):
@@ -231,51 +222,8 @@ class TransformerClassifier(BaseFairseqModel):
         )
 
         encoder = TransformerEncoder(args, src_dict, encoder_embed_tokens)
-
-        return TransformerClassifier(encoder, tgt_dict, args.encoder_embed_dim)
-
-    def forward(self, src_tokens, src_lengths, **_):
-
-        encoder_out = self.encoder(src_tokens, src_lengths)['encoder_out']
-
-        # T x B x C -> B x T x C
-        transposed = encoder_out.transpose(0, 1)
-
-        # Average over the token embeddings, which of course removes token
-        # position information. (Before, I instead tried flattening the token
-        # and embedding dimensions to preserve positional information, but this
-        # led to out-of-memory errors.)
-        averaged = torch.mean(transposed, dim=1, keepdim=True)
-
-        # Duplicate the elements of the tensor over the token dimension so that
-        # the size of the token dimension will equal 2, same as the number of
-        # target positions. Since the second target token is always EOS, this
-        # means that half of the connections of the linear layer will map to
-        # logit nodes for a dummy position.
-        repeated = averaged.repeat(1, 2, 1)
-
-        logits = F.linear(repeated, self.embed_out)
-        attn = None
-
-        return logits, attn
-
-    def get_normalized_probs(self, net_output, log_probs, sample=None):
-        """Get normalized probabilities (or log probs) from a net's output."""
-
-        logits = net_output[0].float()
-        if log_probs:
-            return F.log_softmax(logits, dim=-1)
-        else:
-            return F.softmax(logits, dim=-1)
-
-    def max_positions(self):
-        """
-        Tuple of length 2:
-        0. Maximum input length supported by the encoder
-        1. 2 because the target sequence is a classification label (+ a stop
-            token)
-        """
-        return self.encoder.max_positions(), 2
+        decoder = TransformerClassifierDecoder(tgt_dict, args.encoder_embed_dim)
+        return TransformerClassifier(encoder, decoder)
 
 
 class TransformerEncoder(FairseqEncoder):
@@ -458,6 +406,51 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                         del state_dict[k]
 
         return state_dict
+
+
+class TransformerClassifierDecoder(FairseqDecoder):
+    """
+    This decoder is just a supervised layer to provide a logit output useful for
+    classifying input text.
+    """
+
+    def __init__(self, dictionary, embed_dim):
+        super().__init__(dictionary)
+
+        self.embed_out = nn.Parameter(
+            torch.Tensor(len(self.tgt_dict), embed_dim),
+        )
+        nn.init.normal_(self.embed_out, mean=0, std=embed_dim ** -0.5)
+
+    def forward(self, _, encoder_out):
+
+        # T x B x C -> B x T x C
+        transposed = encoder_out['encoder_out'].transpose(0, 1)
+
+        # Average over the token embeddings, which of course removes token
+        # position information. (Before, I instead tried flattening the token
+        # and embedding dimensions to preserve positional information, but this
+        # led to out-of-memory errors.)
+        averaged = torch.mean(transposed, dim=1, keepdim=True)
+
+        # Duplicate the elements of the tensor over the token dimension so that
+        # the size of the token dimension will equal 2, same as the number of
+        # target positions. Since the second target token is always EOS, this
+        # means that half of the connections of the linear layer will map to
+        # logit nodes for a dummy position.
+        repeated = averaged.repeat(1, 2, 1)
+
+        logits = F.linear(repeated, self.embed_out)
+        attn = None
+
+        return logits, attn
+
+    def max_positions(self):
+        """
+        Maximum output length supported by the decoder. This is 2 because the
+        target sequence is a classification label (+ an EOS token)
+        """
+        return 2
 
 
 class TransformerEncoderLayer(nn.Module):

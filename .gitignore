@@ -107,4 +107,5 @@ ENV/
 fairseq/temporal_convolution_tbc
 
 # PyCharm
+*.iml
 *.xml
