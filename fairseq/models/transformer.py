@@ -427,11 +427,11 @@ class TransformerClassifierDecoder(FairseqDecoder):
         # T x B x C -> B x T x C
         transposed = encoder_out['encoder_out'].transpose(0, 1)
 
-        # Average over the token embeddings, which of course removes token
+        # Take the max over the token embeddings, which of course removes token
         # position information. (Before, I instead tried flattening the token
         # and embedding dimensions to preserve positional information, but this
         # led to out-of-memory errors.)
-        averaged = torch.mean(transposed, dim=1, keepdim=True)
+        averaged, _ = torch.max(transposed, dim=1, keepdim=True)
 
         # Duplicate the elements of the tensor over the token dimension so that
         # the size of the token dimension will equal 2, same as the number of
