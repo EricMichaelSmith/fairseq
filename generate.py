@@ -164,11 +164,7 @@ def main(args):
                             target_str, tgt_dict, add_if_not_exist=True)
                     scorer.add(target_tokens, hypo_tokens)
 
-                    output_string = ','.join([
-                        src_str.replace('"', ''), target_str.replace('"', ''),
-                        f"{hypo['score']:0.4f}", hypo_str.replace('"', ''),
-                    ])
-                    f_write.write(f'{output_string}\n')
+                    f_write.write(f'{target_str}\t{hypo_str}\t{src_str}\n')
 
             wps_meter.update(src_tokens.size(0))
             t.log({'wps': round(wps_meter.avg)})
