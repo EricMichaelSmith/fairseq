@@ -166,7 +166,7 @@ def main(args):
 
                     output_string = ','.join([
                         src_str.replace('"', ''), target_str.replace('"', ''),
-                        hypo['score'], hypo_str.replace('"', ''),
+                        f"{hypo['score']:0.4f}", hypo_str.replace('"', ''),
                     ])
                     f_write.write(f'{output_string}\n')
 
