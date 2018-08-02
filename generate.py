@@ -165,8 +165,7 @@ def main(args):
                     scorer.add(target_tokens, hypo_tokens)
 
                     output_string = ','.join([
-                        sample_id, src_str.replace('"', ''),
-                        target_str.replace('"', ''),
+                        src_str.replace('"', ''), target_str.replace('"', ''),
                         hypo['score'], hypo_str.replace('"', ''),
                     ])
                     f_write.write(f'{output_string}\n')
