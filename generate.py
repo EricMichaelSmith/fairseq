@@ -136,7 +136,6 @@ def main(args):
                     print('T-{}\t{}'.format(sample_id, target_str))
 
             # Process top predictions
-            hypo_strs_to_scores = {}
             for i, hypo in enumerate(hypos[:min(len(hypos), args.nbest)]):
                 hypo_tokens, hypo_str, alignment = utils.post_process_prediction(
                     hypo_tokens=hypo['tokens'].int().cpu(),
@@ -171,16 +170,11 @@ def main(args):
                             target_str, tgt_dict, add_if_not_exist=True)
                     scorer.add(target_tokens, hypo_tokens)
 
-                    most_likely_hypo_str = hypo_str
+                    output_string = '\t'.join([target_str, hypo_str, src_str])
+                    f_write.write(f'{output_string}\n')
 
-                hypo_strs_to_scores[hypo_str] = hypo['score']
-
-            if has_target:
-                output_string = '\t'.join([
-                    target_str, most_likely_hypo_str, src_str,
-                    json.dumps(hypo_strs_to_scores),
-                ])
-                f_write.write(f'{output_string}\n')
+                    log_probs = hypo['positional_scores'].cpu().numpy().tolist()
+                    # {{{TODO: save log probs in a separate file and also save tgt_dict}}}
 
             wps_meter.update(src_tokens.size(0))
             t.log({'wps': round(wps_meter.avg)})
