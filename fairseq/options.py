@@ -291,6 +291,8 @@ def add_generation_args(parser):
                        help='perform unknown replacement (optionally with alignment dictionary)')
     group.add_argument('--score-reference', action='store_true',
                        help='just score the reference translation')
+    group.add_argument('--classify', action='store_true',
+                       help='calculate the log probs of the first target token')
     group.add_argument('--prefix-size', default=0, type=int, metavar='PS',
                        help='initialize generation by target prefix of given length')
     group.add_argument('--sampling', action='store_true',

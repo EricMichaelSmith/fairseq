@@ -22,13 +22,15 @@ class SequenceScorer(object):
             model.cuda()
         return self
 
-    def score_batched_itr(self, data_itr, cuda=False, timer=None):
+    def score_batched_itr(
+        self, data_itr, cuda=False, timer=None, get_log_probs=False,
+    ):
         """Iterate over a batched dataset and yield scored translations."""
         for sample in data_itr:
             s = utils.move_to_cuda(sample) if cuda else sample
             if timer is not None:
                 timer.start()
-            pos_scores, attn = self.score(s)
+            pos_scores, attn = self.score(s, get_log_probs)
             for i, id in enumerate(s['id'].data):
                 # remove padding from ref
                 src = utils.strip_pad(s['net_input']['src_tokens'].data[i, :], self.pad)
@@ -53,7 +55,7 @@ class SequenceScorer(object):
                 # return results in the same format as SequenceGenerator
                 yield id, src, ref, hypos
 
-    def score(self, sample):
+    def score(self, sample, get_log_probs):
         """Score a batch of translations."""
         net_input = sample['net_input']
 
@@ -81,8 +83,11 @@ class SequenceScorer(object):
         avg_probs.log_()
         if avg_attn is not None:
             avg_attn.div_(len(self.models))
-        avg_probs = avg_probs.gather(
-            dim=2,
-            index=sample['target'].data.unsqueeze(-1),
-        )
-        return avg_probs.squeeze(2), avg_attn
+        if get_log_probs:
+            return avg_probs, avg_attn
+        else:
+            avg_probs = avg_probs.gather(
+                dim=2,
+                index=sample['target'].data.unsqueeze(-1),
+            )
+            return avg_probs.squeeze(2), avg_attn

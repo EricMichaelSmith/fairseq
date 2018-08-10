@@ -69,7 +69,7 @@ def main(args):
 
     # Initialize generator
     gen_timer = StopwatchMeter()
-    if args.score_reference:
+    if args.score_reference or args.classify:
         translator = SequenceScorer(models, task.target_dictionary)
     else:
         translator = SequenceGenerator(
@@ -89,6 +89,10 @@ def main(args):
     with progress_bar.build_progress_bar(args, itr) as t:
         if args.score_reference:
             translations = translator.score_batched_itr(t, cuda=use_cuda, timer=gen_timer)
+        elif args.classify:
+            translations = translator.score_batched_itr(
+                t, cuda=use_cuda, timer=gen_timer, get_log_probs=True,
+            )
         else:
             translations = translator.generate_batched_itr(
                 t, maxlen_a=args.max_len_a, maxlen_b=args.max_len_b,
