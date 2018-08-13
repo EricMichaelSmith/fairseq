@@ -6,8 +6,6 @@
 # the root directory of this source tree. An additional grant of patent rights
 # can be found in the PATENTS file in the same directory.
 
-import json
-
 import torch
 
 from fairseq import bleu, data, options, progress_bar, tasks, tokenizer, utils
