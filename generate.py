@@ -116,7 +116,7 @@ def main(args):
                 class_ for idx, class_ in enumerate(tgt_dict.symbols)
                 if idx in class_idxes_to_save
             ]
-            f_write.write(','.join(header_parts))
+            f_write.write(','.join(header_parts) + '\n')
 
         wps_meter = TimeMeter()
         for sample_id, src_tokens, target_tokens, hypos in translations:
@@ -188,7 +188,7 @@ def main(args):
                             if idx in class_idxes_to_save
                             and log_probs[idx] == max(selected_log_probs)
                         ][0]
-                        output_string = '\t'.join(
+                        output_string = ','.join(
                             [target_str, predicted_label, src_str] + [
                                 f'{log_prob:0.6f}'
                                 for log_prob in selected_log_probs
