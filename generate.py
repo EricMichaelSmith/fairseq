@@ -98,7 +98,8 @@ def main(args):
             )
 
         # Create a file object to write outputs to
-        if args.classify and args.output_file is not None:
+        save_output_file = (args.classify and args.output_file is not None)
+        if save_output_file:
 
             f_write = open(args.output_file, 'w')
             class_idxes_to_save = [
@@ -173,7 +174,7 @@ def main(args):
                     scorer.add(target_tokens, hypo_tokens)
 
                     # Save outputs to disk
-                    if args.classify and args.output_file is not None:
+                    if save_output_file:
                         log_probs = (
                             hypo['positional_scores'][0].cpu().numpy().tolist()
                         )
@@ -199,7 +200,8 @@ def main(args):
             t.log({'wps': round(wps_meter.avg)})
             num_sentences += 1
 
-        f_write.close()
+        if save_output_file:
+            f_write.close()
 
     print('| Translated {} sentences ({} tokens) in {:.1f}s ({:.2f} sentences/s, {:.2f} tokens/s)'.format(
         num_sentences, gen_timer.n, gen_timer.sum, num_sentences / gen_timer.sum, 1. / gen_timer.avg))
