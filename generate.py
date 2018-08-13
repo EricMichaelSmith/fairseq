@@ -184,7 +184,7 @@ def main(args):
                         ]
                         predicted_label = [
                             class_
-                            for idx, class_ in enumerate(tgt_dict.symbols())
+                            for idx, class_ in enumerate(tgt_dict.symbols)
                             if idx in class_idxes_to_save
                             and log_probs[idx] == max(selected_log_probs)
                         ][0]
