@@ -98,20 +98,24 @@ def main(args):
             )
 
         # Create a file object to write outputs to
-        if args.output_file is not None:
+        if args.classify and args.output_file is not None:
 
             f_write = open(args.output_file, 'w')
+            class_idxes_to_save = [
+                idx for idx, class_ in enumerate(tgt_dict.symbols)
+                if idx not in [0, tgt_dict.pad(), tgt_dict.eos(), tgt_dict.unk()]
+                and not class_.startswith('madeupword')
+            ]
+            # Remove index 0 because that's a Lua legacy position
 
-        else:
-
-            class DummyFileObj:
-                def write(self, str_):
-                    pass
-
-                def close(self):
-                    pass
-
-            f_write = DummyFileObj()
+            # Write header line for output file
+            header_parts = [
+                'actual_label', 'predicted_label', 'source_string',
+            ] + [
+                class_ for idx, class_ in enumerate(tgt_dict.symbols)
+                if idx in class_idxes_to_save
+            ]
+            f_write.write(','.join(header_parts))
 
         wps_meter = TimeMeter()
         for sample_id, src_tokens, target_tokens, hypos in translations:
@@ -168,11 +172,28 @@ def main(args):
                             target_str, tgt_dict, add_if_not_exist=True)
                     scorer.add(target_tokens, hypo_tokens)
 
-                    output_string = '\t'.join([target_str, hypo_str, src_str])
-                    f_write.write(f'{output_string}\n')
-
-                    log_probs = hypo['positional_scores'].cpu().numpy().tolist()
-                    # {{{TODO: save log probs in a separate file and also save tgt_dict}}}
+                    # Save outputs to disk
+                    if args.classify and args.output_file is not None:
+                        log_probs = (
+                            hypo['positional_scores'][0].cpu().numpy().tolist()
+                        )
+                        selected_log_probs = [
+                            log_prob for idx, log_prob in enumerate(log_probs)
+                            if idx in class_idxes_to_save
+                        ]
+                        predicted_label = [
+                            class_
+                            for idx, class_ in enumerate(tgt_dict.symbols())
+                            if idx in class_idxes_to_save
+                            and log_probs[idx] == max(selected_log_probs)
+                        ][0]
+                        output_string = '\t'.join(
+                            [target_str, predicted_label, src_str] + [
+                                f'{log_prob:0.6f}'
+                                for log_prob in selected_log_probs
+                            ]
+                        )
+                        f_write.write(f'{output_string}\n')
 
             wps_meter.update(src_tokens.size(0))
             t.log({'wps': round(wps_meter.avg)})
