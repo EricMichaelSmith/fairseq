@@ -133,6 +133,7 @@ class TranslationTask(FairseqTask):
             left_pad_target=self.args.left_pad_target,
             max_source_positions=self.args.max_source_positions,
             max_target_positions=self.args.max_target_positions,
+            preserve_order=getattr(self.args, 'preserve_order', False),
         )
 
     @property

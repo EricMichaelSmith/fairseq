@@ -11,7 +11,7 @@ import torch
 from . import data_utils, FairseqDataset
 
 
-def collate(samples, pad_idx, eos_idx, left_pad_source=True, left_pad_target=False):
+def collate(samples, pad_idx, eos_idx, left_pad_source=True, left_pad_target=False, sort=True):
     if len(samples) == 0:
         return {}
 
@@ -25,7 +25,10 @@ def collate(samples, pad_idx, eos_idx, left_pad_source=True, left_pad_target=Fal
     src_tokens = merge('source', left_pad=left_pad_source)
     # sort by descending source length
     src_lengths = torch.LongTensor([s['source'].numel() for s in samples])
-    src_lengths, sort_order = src_lengths.sort(descending=True)
+    if sort:
+        src_lengths, sort_order = src_lengths.sort(descending=True)
+    else:
+        sort_order = torch.arange(id.numel())
     id = id.index_select(0, sort_order)
     src_tokens = src_tokens.index_select(0, sort_order)
 
@@ -66,7 +69,7 @@ class LanguagePairDataset(FairseqDataset):
         tgt=None, tgt_sizes=None, tgt_dict=None,
         left_pad_source=True, left_pad_target=False,
         max_source_positions=1024, max_target_positions=1024,
-        shuffle=True,
+        shuffle=True, preserve_order=False,
     ):
         if tgt_dict is not None:
             assert src_dict.pad() == tgt_dict.pad()
@@ -83,6 +86,7 @@ class LanguagePairDataset(FairseqDataset):
         self.max_source_positions = max_source_positions
         self.max_target_positions = max_target_positions
         self.shuffle = shuffle
+        self.preserve_order = preserve_order
 
     def __getitem__(self, index):
         return {
@@ -99,6 +103,7 @@ class LanguagePairDataset(FairseqDataset):
         return collate(
             samples, pad_idx=self.src_dict.pad(), eos_idx=self.src_dict.eos(),
             left_pad_source=self.left_pad_source, left_pad_target=self.left_pad_target,
+            sort=not self.preserve_order,
         )
 
     def get_dummy_batch(self, num_tokens, max_positions, src_len=128, tgt_len=128):
