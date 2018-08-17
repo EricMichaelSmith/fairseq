@@ -129,6 +129,7 @@ class EpochBatchIterator(object):
         self.max_sentences = max_sentences if max_sentences is not None else float('Inf')
         self.max_positions = max_positions
         self.ignore_invalid_inputs = ignore_invalid_inputs
+        self.preserve_order = preserve_order
         self.bsz_mult = required_batch_size_multiple
         self.seed = seed
         self.num_shards = num_shards
