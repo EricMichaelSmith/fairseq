@@ -60,6 +60,7 @@ def main(args):
         max_sentences=args.max_sentences,
         max_positions=models[0].max_positions(),
         ignore_invalid_inputs=args.skip_invalid_size_inputs_valid_test,
+        preserve_order=args.preserve_order,
         required_batch_size_multiple=8,
         num_shards=args.num_shards,
         shard_id=args.shard_id,

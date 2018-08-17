@@ -110,6 +110,7 @@ class EpochBatchIterator(object):
         max_sentences: max number of sentences in each batch
         max_positions: max sentence length supported by the model
         ignore_invalid_inputs: don't raise Exception for sentences that are too long
+        preserve_order: don't sort sequences by size
         required_batch_size_multiple: require batch size to be a multiple of N
         seed: seed for random number generator for reproducibility
         num_shards: shard the data iterator into N shards
@@ -118,7 +119,8 @@ class EpochBatchIterator(object):
 
     def __init__(
         self, dataset, max_tokens=None, max_sentences=None, max_positions=None,
-        ignore_invalid_inputs=False, required_batch_size_multiple=1, seed=1,
+        ignore_invalid_inputs=False, preserve_order=False,
+        required_batch_size_multiple=1, seed=1,
         num_shards=1, shard_id=0,
     ):
         assert isinstance(dataset, FairseqDataset)
@@ -208,7 +210,11 @@ class EpochBatchIterator(object):
         sample_len = 0
         sample_lens = []
         ignored = []
-        for idx in self.dataset.ordered_indices():
+        if self.preserve_order:
+            idxes = np.arange(len(self))
+        else:
+            idxes = self.dataset.ordered_indices()
+        for idx in idxes:
             if not self.dataset.valid_size(idx, self.max_positions):
                 if self.ignore_invalid_inputs:
                     ignored.append(idx)
