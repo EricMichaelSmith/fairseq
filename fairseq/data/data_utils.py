@@ -212,7 +212,7 @@ class EpochBatchIterator(object):
         sample_lens = []
         ignored = []
         if self.preserve_order:
-            idxes = np.arange(len(self))
+            idxes = np.arange(len(self.dataset))
         else:
             idxes = self.dataset.ordered_indices()
         for idx in idxes:
